@@ -22,3 +22,4 @@ class SplunkStackStack(cdk.Stack):
         splunk_instance = ec2.Instance(self, 'splunk', instance_type = instance_type, 
                                 machine_image = ami, vpc = vpc, security_group = splunk_sg)
         alb = lb.ApplicationLoadBalancer(self, 'alb', vpc = vpc)
+        splunk_sg.connections.allow_from(alb, ec2.Port.tcp(8000))
