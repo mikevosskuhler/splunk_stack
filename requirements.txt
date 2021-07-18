@@ -2,3 +2,6 @@
 aws_cdk.aws_ec2
 aws_cdk.aws_elasticloadbalancingv2
 aws_cdk.aws_elasticloadbalancingv2_targets
+aws_cdk.aws_certificatemanager
+aws_cdk.aws_route53
+aws_cdk.aws_route53_targets

@@ -2,6 +2,9 @@ from aws_cdk import core as cdk
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_elasticloadbalancingv2 as lb
 from aws_cdk import aws_elasticloadbalancingv2_targets as lbt
+from aws_cdk import aws_certificatemanager as acm
+from aws_cdk import aws_route53 as route53
+from aws_cdk import aws_route53_targets as alias
 
 # For consistency with other languages, `cdk` is the preferred import name for
 # the CDK's core module.  The following line also imports it as `core` for use
@@ -24,5 +27,26 @@ class SplunkStackStack(cdk.Stack):
                                 machine_image = ami, vpc = vpc, security_group = splunk_sg)
         alb = lb.ApplicationLoadBalancer(self, 'alb', vpc = vpc, internet_facing = True)
         splunk_sg.connections.allow_from(alb, ec2.Port.tcp(8000))
-        listener = alb.add_listener("Listener", port=80, open=True)
+        splunk_sg.connections.allow_from(alb, ec2.Port.tcp(8088))
+        alb.add_redirect()
+        
+
+        my_hosted_zone = route53.HostedZone.from_lookup(self, 'importedzone', domain_name='vosskuhler.com')
+        #route53.HostedZone(self, "HostedZone",
+        #     zone_name="vosskuhler.com")
+        
+        certificate = acm.Certificate(self, "Certificate",
+            domain_name="splunk.vosskuhler.com",
+            validation=acm.CertificateValidation.from_dns(my_hosted_zone)
+        )
+        
+        listener = alb.add_listener("Listener",certificates=[lb.ListenerCertificate(certificate.certificate_arn)], port=443, open=True)
         listener.add_targets("splunk", port=8000, targets=[lbt.InstanceTarget(splunk_instance)] )
+        listener_hec = alb.add_listener("Listener_hec",certificates=[lb.ListenerCertificate(certificate.certificate_arn)], port=8088, open=True, protocol=lb.ApplicationProtocol('HTTPS'))
+        listener_hec.add_targets("splunk_hec", port=8088, protocol=lb.ApplicationProtocol('HTTPS'), targets=[lbt.InstanceTarget(splunk_instance)])
+        
+        route53.ARecord(self, "cnamerecord",
+        zone=my_hosted_zone,
+        target=route53.RecordTarget.from_alias(alias.LoadBalancerTarget(alb)),
+        record_name='splunk.vosskuhler.com'
+        )

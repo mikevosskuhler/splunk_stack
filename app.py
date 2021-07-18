@@ -26,7 +26,7 @@ SplunkStackStack(app, "SplunkStackStack",
     # Uncomment the next line if you know exactly what Account and Region you
     # want to deploy the stack to. */
 
-    env=core.Environment(account='213060943999', region='eu-central-1'),
+    env=core.Environment(account='022998352254', region='eu-central-1'),
 
     # For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
     )
