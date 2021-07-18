@@ -18,11 +18,16 @@ class SplunkStackStack(cdk.Stack):
     def __init__(self, scope: cdk.Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+
+        '''
+        create a vpc for the splunk environment, cdk will take care of subnetting
+        additionally create a sg for the splunk instance that only accepts request from the alb
+        the redirect compensates for splunk trying to redirect to http on every response
+        '''
         vpc = ec2.Vpc(self, 'vpc', max_azs=2)
         instance_type = ec2.InstanceType('t2.micro')
         ami = ec2.LookupMachineImage(name = 'splunk_AMI_8.2.0_2021*')
         splunk_sg = ec2.SecurityGroup(self, 'splunk_sg', vpc = vpc)
-        # pub_ips = vpc.select_subnets(ec2.SubnetType('PRIVATE'))
         splunk_instance = ec2.Instance(self, 'splunk', instance_type = instance_type, 
                                 machine_image = ami, vpc = vpc, security_group = splunk_sg)
         alb = lb.ApplicationLoadBalancer(self, 'alb', vpc = vpc, internet_facing = True)
@@ -30,21 +35,25 @@ class SplunkStackStack(cdk.Stack):
         splunk_sg.connections.allow_from(alb, ec2.Port.tcp(8088))
         alb.add_redirect()
         
-
+        # import existing hosted zone and create certificate using dns based validation
         my_hosted_zone = route53.HostedZone.from_lookup(self, 'importedzone', domain_name='vosskuhler.com')
-        #route53.HostedZone(self, "HostedZone",
-        #     zone_name="vosskuhler.com")
-        
         certificate = acm.Certificate(self, "Certificate",
             domain_name="splunk.vosskuhler.com",
             validation=acm.CertificateValidation.from_dns(my_hosted_zone)
         )
         
+        '''
+        configure listeners on the alb, by default splunk uses http on 8000 and https on 8088
+        ssl offloading will take care off the TLS certificate and allows us to not have to reconfigure 
+        splunk to utilize https on port 8000. To check HEC health you can visit <url>:8088/services/collector/health/1.0
+        '''
         listener = alb.add_listener("Listener",certificates=[lb.ListenerCertificate(certificate.certificate_arn)], port=443, open=True)
         listener.add_targets("splunk", port=8000, targets=[lbt.InstanceTarget(splunk_instance)] )
         listener_hec = alb.add_listener("Listener_hec",certificates=[lb.ListenerCertificate(certificate.certificate_arn)], port=8088, open=True, protocol=lb.ApplicationProtocol('HTTPS'))
         listener_hec.add_targets("splunk_hec", port=8088, protocol=lb.ApplicationProtocol('HTTPS'), targets=[lbt.InstanceTarget(splunk_instance)])
+
         
+        # configure dns to forward traffic to the alb
         route53.ARecord(self, "cnamerecord",
         zone=my_hosted_zone,
         target=route53.RecordTarget.from_alias(alias.LoadBalancerTarget(alb)),
