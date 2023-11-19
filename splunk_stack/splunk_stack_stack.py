@@ -33,6 +33,7 @@ class SplunkStackStack(cdk.Stack):
         alb = lb.ApplicationLoadBalancer(self, 'alb', vpc = vpc, internet_facing = True)
         splunk_sg.connections.allow_from(alb, ec2.Port.tcp(8000))
         splunk_sg.connections.allow_from(alb, ec2.Port.tcp(8088))
+        splunk_sg.connections.allow_from(alb, ec2.Port.tcp(8089))
         alb.add_redirect()
         
         # import existing hosted zone and create certificate using dns based validation
