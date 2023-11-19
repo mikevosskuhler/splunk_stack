@@ -26,7 +26,7 @@ class SplunkStackStack(cdk.Stack):
         '''
         vpc = ec2.Vpc(self, 'vpc', max_azs=2)
         instance_type = ec2.InstanceType('t2.micro')
-        ami = ec2.LookupMachineImage(name = 'splunk_AMI_8.2.0_2021*')
+        ami = ec2.LookupMachineImage(name = 'splunk_AMI_9.1.1_2023*')
         splunk_sg = ec2.SecurityGroup(self, 'splunk_sg', vpc = vpc)
         splunk_instance = ec2.Instance(self, 'splunk', instance_type = instance_type, 
                                 machine_image = ami, vpc = vpc, security_group = splunk_sg)
@@ -51,6 +51,8 @@ class SplunkStackStack(cdk.Stack):
         listener.add_targets("splunk", port=8000, targets=[lbt.InstanceTarget(splunk_instance)] )
         listener_hec = alb.add_listener("Listener_hec",certificates=[lb.ListenerCertificate(certificate.certificate_arn)], port=8088, open=True, protocol=lb.ApplicationProtocol('HTTPS'))
         listener_hec.add_targets("splunk_hec", port=8088, protocol=lb.ApplicationProtocol('HTTPS'), targets=[lbt.InstanceTarget(splunk_instance)])
+        listener_api = alb.add_listener("Listener_hec",certificates=[lb.ListenerCertificate(certificate.certificate_arn)], port=8089, open=True, protocol=lb.ApplicationProtocol('HTTPS'))
+        listener_api.add_targets("splunk_hec", port=8089, protocol=lb.ApplicationProtocol('HTTPS'), targets=[lbt.InstanceTarget(splunk_instance)])
 
         
         # configure dns to forward traffic to the alb
